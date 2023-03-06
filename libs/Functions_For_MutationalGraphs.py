@@ -19,10 +19,9 @@ from matplotlib.lines import Line2D
 import seaborn as sns
 sns.set_theme(style="ticks", color_codes=True)
 
-
-def autolabel(ax,x,text,textcolor):
-    ax.text(x, 50, text, color=textcolor,ha='center', va='center', rotation=90,weight="bold")
-    
+#################
+####Define constants and functions related to them    
+#################
 
 min_val_AAlabel=10 # % of alt alleles to add amino acide label
 def def_min_val_label(n):
@@ -102,25 +101,19 @@ def translate(seq):
 with open('libs/NC_045512.2.fasta', 'r') as file:
     refseq= file.read().partition("\n")[2]
     
-
+    
 
 
 def getSubstitutions(t):
     # Scan the table and get all mutations>50%
-    columns=list(set(t.columns)-set(['POS', 'REF']))
-    n_min=t[columns].sum(axis=1)/2
-    # for each possible reference allele :
-    pp=[]
-    for s in ["A","C","G","T"]:
-        p=t[(t["REF"]!=s) & (t[s]>=n_min)]["POS"]
-        pp+=[(i,s) for i in p]
+    pp=getPositionAndState(t,50,100,False)
     #build a list of annotation for each position
     finallist=[]
     for n,alt in pp:
         start=[i for i in genes if i<=n and genes[i][1]>=n]
         if start==[]:
-            finallist+=[(str(n),"IG")]
-        else:
+            finallist+=[(str(n),"")]
+        elif alt!="-":
             start=start[-1]
             #g=[genes[i][0] for i in genes if i<n and genes[i][1]>n][0]
             if start==266 and n-start>13460: #frameshift of ORF1b
@@ -130,7 +123,7 @@ def getSubstitutions(t):
             posInCodon=(n-start)%3
             refcodon=refseq[posCodonInNuc-1:posCodonInNuc+2]
             newcodon = refcodon[:posInCodon] + alt + refcodon[posInCodon + 1:]
-            for n2 in range(posCodonInNuc-1,posCodonInNuc+2):
+            for n2 in range(n-posInCodon,n-posInCodon+3):
                 if n2!=n and n2 in [i[0] for i in pp]:
                     alt2=[i[1] for i in pp if i[0]==n2][0]
                     posInCodon2=posInCodon+n2-n
@@ -142,9 +135,72 @@ def getSubstitutions(t):
                     AAnew="?"
                 finallist+=[(str(n),AAinit+str(posCodonInProt)+AAnew)]
     return(finallist)
-    
-    
             
+       
+            
+#Create a list of panda table containing all the numbers for each of the 29903 positions
+def openfiles(inputfiles):
+    tablelist=[]
+    for file in inputfiles:
+        if path.isfile(file):
+            t=pd.read_csv(file,sep="\t")
+            tablelist.append(t)
+        else:
+            print("ERROR NO SUCH FILE : "+file)
+            return None;
+    return tablelist
+
+def sumperline(t):
+    columns=list(set(t.columns)-set(['POS', 'REF']))
+    return(t[columns].sum(axis=1))
+
+# Loop through a table and keep only the positions where an alternative allele represent
+# more than min% of the total number of samples
+def getPositionAndState(t,percentmin,percentmax,addmissing):
+    statelist=["A","C","G","T","-"]
+    if addmissing : statelist+=["N"]
+    #absolute minimum number of sample
+    columns=list(set(t.columns)-set(['POS', 'REF']))
+    n_min=sumperline(t)/100*percentmin
+    n_max=sumperline(t)/100*percentmax
+    # for each possible reference allele :
+    totalposlist=[]
+    for s in statelist:
+        p=t[(t["REF"]!=s) & (s!=0) & (t[s]>=n_min) & (t[s]<=n_max)]["POS"]
+        totalposlist+=[(i,s) for i in p]
+    return totalposlist
+
+
+# Loop through the tables and keep only the positions wher an alternative allele represent
+# more than min% of the total number of samples
+def getpositions(tablelist,percentmin=0,percentmax=100,addmissing=False):
+    totalposlist=[]
+    for t in tablelist:
+        totalposlist+=getPositionAndState(t,percentmin,percentmax,addmissing)
+    totalposlist=list(set([i[0] for i in totalposlist]))
+    totalposlist.sort()
+    return totalposlist
+
+    
+
+def autolabel(ax,x,text,textcolor):
+    ax.text(x, 50, text, color=textcolor,ha='center', va='center', rotation=90,weight="bold")
+
+    
+def sumperline(t):
+    return(t[list(set(t.columns)-set(['POS', 'REF']))].sum(axis=1))
+    
+def addpos(ref,alt,all_bottoms,axx,all_pos_toplot,x_names):
+    values=all_pos_toplot[alt].copy()
+    if ref in ["A","C","G","T"]:
+        values[all_pos_toplot['REF'] != ref] = 0
+    values=values/sumperline(all_pos_toplot)*100
+    axx.bar(x_names, values,
+            bottom=all_bottoms,
+            color=get_col(ref,alt),
+            edgecolor="none",width=1)
+    return values
+    
 def addgenenames(ax, x_names):
     n_pos=len(x_names)
     ax.set(yticks=[25,50,75])
@@ -166,105 +222,13 @@ def addgenenames(ax, x_names):
                     mean+=i/len(pospos)
             mean=int(mean)
             autolabel(ax,mean,gene_name,"white")
-            
-            
-#Create a list of panda table containing all the numbers for each of the 29903 positions
-def openfiles(inputfiles):
-    tablelist=[]
-    for file in inputfiles:
-        if path.isfile(file):
-            t=pd.read_csv(file,sep="\t")
-            tablelist.append(t)
-        else:
-            print("ERROR NO SUCH FILE : "+file)
-            return None;
-    return tablelist
-
-def sumperline(t):
-    return(t[set(t.columns)-set(['POS', 'REF'])].sum(axis=1))
-
-# Loop through the tables and keep only the positions wher an alternative allele represent
-# more than min% of the total number of samples
-def getpositions(tablelist,percentmin=0,percentmax=100,addmissing=False):
-    totalposlist=[]
-    statelist=["A","C","G","T","-"]
-    if addmissing : statelist+=["N"]
-    for t in tablelist:
-        #absolute minimum number of sample
-        columns=list(set(t.columns)-set(['POS', 'REF']))
-        n_min=t[columns].sum(axis=1)/100*percentmin
-        n_max=t[columns].sum(axis=1)/100*percentmax
-        # for each possible reference allele :
-        for s in statelist:
-            p=t[(t["REF"]!=s) & (s!=0) & (t[s]>=n_min) & (t[s]<=n_max)]["POS"]
-            totalposlist+=list(p)#[str(i)+"."+s for i in p]
-    totalposlist=list(set(totalposlist))
-    totalposlist.sort()
-    return totalposlist
-    
 
 
-
-def getSubstitutions(t):
-    # Scan the table and get all mutations>50%
-    columns=list(set(t.columns)-set(['POS', 'REF']))
-    n_min=t[columns].sum(axis=1)/2
-    # for each possible reference allele :
-    for s in ["A","C","G","T"]:
-        p=t[(t["REF"]!=s) & (s!=0) & (t[s]>=n_min)]["POS"]
-    pp=[(i,s) for i in p]
-    #build a list of annotation for each position
-    finallist=[]
-    for n,alt in pp:
-        start=[i for i in genes if i<=n and genes[i][1]>=n]
-        if start==[]:
-            finallist+=[(str(n),"IG")]
-        else:
-            start=start[-1]
-            #g=[genes[i][0] for i in genes if i<n and genes[i][1]>n][0]
-            if start==266 and n-start>13460: #frameshift of ORF1b
-                start-=1
-            posCodonInProt=int((n-start)/3)+1
-            posCodonInNuc=n-(n-start)%3
-            posInCodon=(n-start)%3
-            refcodon=refseq[posCodonInNuc-1:posCodonInNuc+2]
-            newcodon = refcodon[:posInCodon] + alt + refcodon[posInCodon + 1:]
-            for n2 in range(posCodonInNuc-1,posCodonInNuc+2):
-                if n2!=n and n2 in [i[0] for i in pp]:
-                    alt2=[i[1] for i in pp if i[0]==n2][0]
-                    posInCodon2=posInCodon+n2-n
-                    newcodon = newcodon[:posInCodon2] + alt2 + newcodon[posInCodon2 + 1:]
-            AAinit=translate(refcodon)
-            AAnew=translate(newcodon)
-            if AAinit!=AAnew:
-                if posCodonInProt==1:
-                    AAnew="?"
-                finallist+=[(str(n),AAinit+str(posCodonInProt)+AAnew)]
-    return(finallist)
-    
-    
-
-def sumperline(t):
-    return(t[list(set(t.columns)-set(['POS', 'REF']))].sum(axis=1))
-    
-def addpos(ref,alt,all_bottoms,axx,all_pos_toplot,x_names):
-    values=all_pos_toplot[alt].copy()
-    if ref in ["A","C","G","T"]:
-        values[all_pos_toplot['REF'] != ref] = 0
-    values=values/sumperline(all_pos_toplot)*100
-    axx.bar(x_names, values,
-            bottom=all_bottoms,
-            color=get_col(ref,alt),
-            edgecolor="none",width=1)
-    return values
-    
-    
 def bighist(tablelist,poslist,y_names,mytitle="",suptables=[],PDFname=""):
     
     fig = plt.figure(figsize=(len(poslist)/3+5,2*(len(tablelist)+len(suptables))), constrained_layout=False)
     ax = fig.add_gridspec(nrows=len(tablelist)+len(suptables)+1, ncols=1, hspace=0).subplots(sharex=True)
     x_names=[str(i) for i in poslist]
-    n_table=len(tablelist)
     for i in range(len(suptables)):
         ax[i].bar(x_names , suptables[i] , color="grey" , edgecolor="none" , width=1)
     for i,t in enumerate(tablelist):
@@ -289,14 +253,16 @@ def bighist(tablelist,poslist,y_names,mytitle="",suptables=[],PDFname=""):
             addpos(ref,"N",all_bottoms,axx,all_pos_toplot,x_names)
         for p,lab in getSubstitutions(all_pos_toplot):
             autolabel(axx,p,lab,"black")
-    ax_last=ax[n_table+len(suptables)]
+    ax_last=ax[len(tablelist)+len(suptables)]
     addgenenames(ax_last,x_names)
     ax_last.tick_params(axis='x',bottom=True,labelrotation=90, labelsize=20)
     legend=[mpatches.Patch(color=label_color[i], label=i.replace("T","U")) for i in label_color]
-    fig.legend(handles=legend,loc='upper right',title=mytitle, bbox_to_anchor=(0.5, 0.5))
+    fig.legend(handles=legend,loc='upper right',title=mytitle)
     fig.subplots_adjust(right=0.9)
     if PDFname!="":
         fig.savefig(PDFname, bbox_inches='tight')
+        
+
         
 
         
