@@ -251,8 +251,8 @@ def bighist(tablelist,poslist,y_names,mytitle="",suptables=[],PDFname=""):
                     all_bottoms+=addpos(ref,alt,all_bottoms,axx,all_pos_toplot,x_names)
             all_bottoms+=addpos(ref,ref,all_bottoms,axx,all_pos_toplot,x_names)
             addpos(ref,"N",all_bottoms,axx,all_pos_toplot,x_names)
-        for p,lab in getSubstitutions(all_pos_toplot):
-            autolabel(axx,p,lab,"black")
+        for p,lab in getSubstitutions(t):
+            if p in x_names: autolabel(axx,p,lab,"black")
     ax_last=ax[len(tablelist)+len(suptables)]
     addgenenames(ax_last,x_names)
     ax_last.tick_params(axis='x',bottom=True,labelrotation=90, labelsize=20)
