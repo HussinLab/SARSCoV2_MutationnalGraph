@@ -23,13 +23,6 @@ sns.set_theme(style="ticks", color_codes=True)
 def autolabel(ax,x,text,textcolor):
     ax.text(x, 50, text, color=textcolor,ha='center', va='center', rotation=90,weight="bold")
     
-#dictionnary to label each mutation
-nucsub_AAname = {}
-def load_mut_names(file):
-    for i,(nuc,AA) in pd.read_csv(file,sep="\t",header=None).iterrows():
-        if AA[0] == AA[-1]: AA="" # do not name synonymous mutations
-        nucsub_AAname[nuc]=AA
-
 
 min_val_AAlabel=10 # % of alt alleles to add amino acide label
 def def_min_val_label(n):
@@ -51,9 +44,8 @@ label_color = {'A>C': 'darkorange',
                'T>G': 'red',
                'ref': 'white',
                'del': 'silver',
-               'missing': 'black'}
-
-
+               'missing': 'black'
+              }
 def get_col(ref,alt):
     if ref==alt:
         return label_color["ref"]
@@ -64,62 +56,10 @@ def get_col(ref,alt):
     else:
         return label_color[ref+">"+alt]
 
-    
-with open('libs/NC_045512.2.fasta', 'r') as file:
-    refseq= file.read().partition("\n")[2]
-    
-#source https://www.geeksforgeeks.org/dna-protein-python-3/ 
-def translate(seq):
-    table = {
-        'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
-        'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
-        'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
-        'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',                
-        'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
-        'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
-        'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
-        'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
-        'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
-        'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
-        'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
-        'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
-        'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
-        'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
-        'TAC':'Y', 'TAT':'Y', 'TAA':'_', 'TAG':'_',
-        'TGC':'C', 'TGT':'C', 'TGA':'_', 'TGG':'W',
-    }
-    protein =""
-    if len(seq)%3 == 0:
-        for i in range(0, len(seq), 3):
-            codon = seq[i:i + 3]
-            protein+= table[codon]
-    return protein
 
-with open('libs/NC_045512.2.fasta', 'r') as file:
-    refseq= file.read().partition("\n")[2]
-
-    
-def getMut(n,alt):
-    start=[i for i in genes if i<n and genes[i][1]>n]
-    if start==[]:
-        return("IG")
-    else:
-        start=start[0]
-    #g=[genes[i][0] for i in genes if i<n and genes[i][1]>n][0]
-    if start==266 and n-start>13460: #frameshift of ORF1b
-        start-=1
-    codonstart=n-(n-start)%3
-    posincodon=(n-start)%3
-    refcodon=refseq[codonstart-1:codonstart+2]
-    newcodon = refcodon[:posincodon] + alt + refcodon[posincodon + 1:]
-    if(translate(refcodon)!=translate(newcodon)):
-        return(translate(refcodon)+str(int((n-start)/3)+1)+translate(newcodon))
-    else:
-        return("")
-
-    
 genes={}
-genes[266]=('ORF1ab',21555)
+genes[266]=('ORF1a',13460)
+genes[13459]=('ORF1b',21555)
 genes[21563]=('Spike',25384)
 genes[25393]=('ORF3a',26220)
 genes[26245]=('E',26472)
@@ -131,6 +71,79 @@ genes[27894]=('ORF8',28259)
 genes[28274]=('N',29533)
 genes[29558]=('ORF10',29674)
 
+translationtable = {
+    'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
+    'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
+    'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
+    'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',                
+    'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
+    'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
+    'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
+    'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
+    'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
+    'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
+    'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
+    'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
+    'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
+    'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
+    'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
+    'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
+}
+#source https://www.geeksforgeeks.org/dna-protein-python-3/ 
+def translate(seq):
+    protein =""
+    if len(seq)%3 == 0:
+        for i in range(0, len(seq), 3):
+            codon = seq[i:i + 3]
+            protein+= translationtable[codon]
+    return protein
+
+    
+with open('libs/NC_045512.2.fasta', 'r') as file:
+    refseq= file.read().partition("\n")[2]
+    
+
+
+
+def getSubstitutions(t):
+    # Scan the table and get all mutations>50%
+    columns=list(set(t.columns)-set(['POS', 'REF']))
+    n_min=t[columns].sum(axis=1)/2
+    # for each possible reference allele :
+    pp=[]
+    for s in ["A","C","G","T"]:
+        p=t[(t["REF"]!=s) & (t[s]>=n_min)]["POS"]
+        pp+=[(i,s) for i in p]
+    #build a list of annotation for each position
+    finallist=[]
+    for n,alt in pp:
+        start=[i for i in genes if i<=n and genes[i][1]>=n]
+        if start==[]:
+            finallist+=[(str(n),"IG")]
+        else:
+            start=start[-1]
+            #g=[genes[i][0] for i in genes if i<n and genes[i][1]>n][0]
+            if start==266 and n-start>13460: #frameshift of ORF1b
+                start-=1
+            posCodonInProt=int((n-start)/3)+1
+            posCodonInNuc=n-(n-start)%3
+            posInCodon=(n-start)%3
+            refcodon=refseq[posCodonInNuc-1:posCodonInNuc+2]
+            newcodon = refcodon[:posInCodon] + alt + refcodon[posInCodon + 1:]
+            for n2 in range(posCodonInNuc-1,posCodonInNuc+2):
+                if n2!=n and n2 in [i[0] for i in pp]:
+                    alt2=[i[1] for i in pp if i[0]==n2][0]
+                    posInCodon2=posInCodon+n2-n
+                    newcodon = newcodon[:posInCodon2] + alt2 + newcodon[posInCodon2 + 1:]
+            AAinit=translate(refcodon)
+            AAnew=translate(newcodon)
+            if AAinit!=AAnew:
+                if posCodonInProt==1:
+                    AAnew="?"
+                finallist+=[(str(n),AAinit+str(posCodonInProt)+AAnew)]
+    return(finallist)
+    
+    
             
 def addgenenames(ax, x_names):
     n_pos=len(x_names)
@@ -178,8 +191,9 @@ def getpositions(tablelist,percentmin=0,percentmax=100,addmissing=False):
     if addmissing : statelist+=["N"]
     for t in tablelist:
         #absolute minimum number of sample
-        n_min=t[set(t.columns)-set(['POS', 'REF'])].sum(axis=1)/100*percentmin
-        n_max=t[set(t.columns)-set(['POS', 'REF'])].sum(axis=1)/100*percentmax
+        columns=list(set(t.columns)-set(['POS', 'REF']))
+        n_min=t[columns].sum(axis=1)/100*percentmin
+        n_max=t[columns].sum(axis=1)/100*percentmax
         # for each possible reference allele :
         for s in statelist:
             p=t[(t["REF"]!=s) & (s!=0) & (t[s]>=n_min) & (t[s]<=n_max)]["POS"]
@@ -191,7 +205,59 @@ def getpositions(tablelist,percentmin=0,percentmax=100,addmissing=False):
 
 
 
+def getSubstitutions(t):
+    # Scan the table and get all mutations>50%
+    columns=list(set(t.columns)-set(['POS', 'REF']))
+    n_min=t[columns].sum(axis=1)/2
+    # for each possible reference allele :
+    for s in ["A","C","G","T"]:
+        p=t[(t["REF"]!=s) & (s!=0) & (t[s]>=n_min)]["POS"]
+    pp=[(i,s) for i in p]
+    #build a list of annotation for each position
+    finallist=[]
+    for n,alt in pp:
+        start=[i for i in genes if i<=n and genes[i][1]>=n]
+        if start==[]:
+            finallist+=[(str(n),"IG")]
+        else:
+            start=start[-1]
+            #g=[genes[i][0] for i in genes if i<n and genes[i][1]>n][0]
+            if start==266 and n-start>13460: #frameshift of ORF1b
+                start-=1
+            posCodonInProt=int((n-start)/3)+1
+            posCodonInNuc=n-(n-start)%3
+            posInCodon=(n-start)%3
+            refcodon=refseq[posCodonInNuc-1:posCodonInNuc+2]
+            newcodon = refcodon[:posInCodon] + alt + refcodon[posInCodon + 1:]
+            for n2 in range(posCodonInNuc-1,posCodonInNuc+2):
+                if n2!=n and n2 in [i[0] for i in pp]:
+                    alt2=[i[1] for i in pp if i[0]==n2][0]
+                    posInCodon2=posInCodon+n2-n
+                    newcodon = newcodon[:posInCodon2] + alt2 + newcodon[posInCodon2 + 1:]
+            AAinit=translate(refcodon)
+            AAnew=translate(newcodon)
+            if AAinit!=AAnew:
+                if posCodonInProt==1:
+                    AAnew="?"
+                finallist+=[(str(n),AAinit+str(posCodonInProt)+AAnew)]
+    return(finallist)
+    
+    
 
+def sumperline(t):
+    return(t[list(set(t.columns)-set(['POS', 'REF']))].sum(axis=1))
+    
+def addpos(ref,alt,all_bottoms,axx,all_pos_toplot,x_names):
+    values=all_pos_toplot[alt].copy()
+    if ref in ["A","C","G","T"]:
+        values[all_pos_toplot['REF'] != ref] = 0
+    values=values/sumperline(all_pos_toplot)*100
+    axx.bar(x_names, values,
+            bottom=all_bottoms,
+            color=get_col(ref,alt),
+            edgecolor="none",width=1)
+    return values
+    
     
 def bighist(tablelist,poslist,y_names,mytitle="",suptables=[],PDFname=""):
     
@@ -201,57 +267,38 @@ def bighist(tablelist,poslist,y_names,mytitle="",suptables=[],PDFname=""):
     n_table=len(tablelist)
     for i in range(len(suptables)):
         ax[i].bar(x_names , suptables[i] , color="grey" , edgecolor="none" , width=1)
-    for i in range(n_table):
+    for i,t in enumerate(tablelist):
         axx=ax[i+len(suptables)]
-        nb_sample=sum(tablelist[i].iloc[0][["A","C","G","T","-","N"]])
-        if nb_sample>2:
-            if nb_sample<10000:
-                str_nb_sample="\nn="+str(nb_sample)+""
-            else:
-                str_nb_sample="\nn="+str(int(nb_sample/1000))+"K"
-        else :
-            str_nb_sample=""
         axx.set(yticks=[25,50,75])
-        axx.set_ylabel(y_names[i]+str_nb_sample,  fontsize=15)
         axx.set_ylim((0,100))
         axx.margins(0, 0)  
-        all_pos_toplot=tablelist[i].loc[tablelist[i]["POS"].isin(poslist)]
+        nb_sample=sum(t.iloc[0][list(set(t.columns)-set(['POS', 'REF']))])
+        if nb_sample<10000:str_nb_sample="\nn="+str(nb_sample)+""
+        else: str_nb_sample="\nn="+str(int(nb_sample/1000))+"K"
+        axx.set_ylabel(y_names[i]+str_nb_sample, fontsize=15)
+        
+        all_pos_toplot=t.loc[t["POS"].isin(poslist)]
         all_bottoms=all_pos_toplot['A']-all_pos_toplot['A']
-        def addpos(ref,alt,all_bottoms):
-            values=all_pos_toplot[alt].copy()
-            if ref in ["A","C","G","T"]:
-                values[all_pos_toplot['REF'] != ref] = 0
-            values=values/nb_sample*100
-            axx.bar(x_names, values,
-                    bottom=all_bottoms,
-                    color=get_col(ref,alt),
-                    edgecolor="none",width=1)
-            for j in range(len(values)):
-                if values.iloc[j]>min_val_AAlabel:
-                    idx=str(all_pos_toplot.iloc[j]["POS"])+ref+">"+alt
-                    if idx in nucsub_AAname:
-                        if ref+">"+alt in ["T>A","G>A","T>C"]:
-                            autolabel(axx,j,getMut(all_pos_toplot.iloc[j]["POS"],alt),"lightgrey")
-                        else: autolabel(axx,j,getMut(all_pos_toplot.iloc[j]["POS"],alt),"black")
-            return values
-        all_bottoms+=addpos("*","-",all_bottoms)
+        all_bottoms+=addpos("*","-",all_bottoms,axx,all_pos_toplot,x_names)
         #loop in all the 12 combinaisons:
         for ref in ["A","C","G","T"]:
             for alt in ["A","C","G","T"]:
                 if alt!=ref:
-                    values=addpos(ref,alt,all_bottoms)
-                    all_bottoms+=values
-            values=addpos(ref,ref,all_bottoms)
-            all_bottoms+=values
-            values=addpos(ref,"N",all_bottoms)
+                    all_bottoms+=addpos(ref,alt,all_bottoms,axx,all_pos_toplot,x_names)
+            all_bottoms+=addpos(ref,ref,all_bottoms,axx,all_pos_toplot,x_names)
+            addpos(ref,"N",all_bottoms,axx,all_pos_toplot,x_names)
+        for p,lab in getSubstitutions(all_pos_toplot):
+            autolabel(axx,p,lab,"black")
     ax_last=ax[n_table+len(suptables)]
     addgenenames(ax_last,x_names)
     ax_last.tick_params(axis='x',bottom=True,labelrotation=90, labelsize=20)
     legend=[mpatches.Patch(color=label_color[i], label=i.replace("T","U")) for i in label_color]
-    fig.legend(handles=legend,loc='center right',title=mytitle, bbox_to_anchor=(1.05, 0.5))
+    fig.legend(handles=legend,loc='upper right',title=mytitle, bbox_to_anchor=(0.5, 0.5))
     fig.subplots_adjust(right=0.9)
     if PDFname!="":
         fig.savefig(PDFname, bbox_inches='tight')
+        
+
         
 def createsuptable(positions,filename, colname):
     t=pd.read_csv(filename,sep="\t")
