@@ -61,6 +61,37 @@ genes[266]=('ORF1a',13460)
 genes[13459]=('ORF1b',21555)
 genes[21563]=('Spike',25384)
 genes[25393]=('ORF3a',26220)
+def getSubstitutions(t):
+    # Scan the table and get all mutations>50%
+    pp=getPositionAndState(t,50,100,False)
+    #build a list of annotation for each position
+    finallist=[]
+    for n,alt in pp:
+        if alt!="-":
+            for start in [i for i in genes if i<=n and genes[i][1]>=n]:
+                posCodonInProt=int((n-start)/3)+1
+                posCodonInNuc=n-(n-start)%3
+                posInCodon=(n-start)%3
+                refcodon=refseq[posCodonInNuc-1:posCodonInNuc+2]
+                newcodon = refcodon[:posInCodon] + alt + refcodon[posInCodon + 1:]
+                for n2 in range(n-posInCodon,n-posInCodon+3):
+                    if n2!=n and n2 in [i[0] for i in pp]:
+                        alt2=[i[1] for i in pp if i[0]==n2][0]
+                        posInCodon2=posInCodon+n2-n
+                        newcodon = newcodon[:posInCodon2] + alt2 + newcodon[posInCodon2 + 1:]
+                AAinit=translate(refcodon)
+                AAnew=translate(newcodon)
+                if AAinit!=AAnew:
+                    if posCodonInProt==1:
+                        AAnew="?"
+                    finallist+=[(str(n),genes[start][0]+":"+AAinit+str(posCodonInProt)+AAnew)]
+    returnlist=[]
+    for p in set([i[0] for i in finallist]):
+        tag="\n".join([i[1] for i in finallist if i[0]==p])
+        returnlist+=[(p,tag)]
+    return(returnlist)
+
+genes[25457]=('ORF3c',25582)
 genes[26245]=('E',26472)
 genes[26523]=('M',27191)
 genes[27202]=('ORF6',27387)
@@ -68,7 +99,8 @@ genes[27394]=('ORF7a',27759)
 genes[27756]=('ORF7b',27887)
 genes[27894]=('ORF8',28259)
 genes[28274]=('N',29533)
-genes[29558]=('ORF10',29674)
+#genes[29558]=('ORF10',29674)
+genes[28284]=('ORF9B',28577)
 
 translationtable = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
@@ -102,40 +134,36 @@ with open('libs/NC_045512.2.fasta', 'r') as file:
     refseq= file.read().partition("\n")[2]
     
     
-
-
 def getSubstitutions(t):
     # Scan the table and get all mutations>50%
     pp=getPositionAndState(t,50,100,False)
     #build a list of annotation for each position
     finallist=[]
     for n,alt in pp:
-        start=[i for i in genes if i<=n and genes[i][1]>=n]
-        if start==[]:
-            finallist+=[(str(n),"")]
-        elif alt!="-":
-            start=start[-1]
-            #g=[genes[i][0] for i in genes if i<n and genes[i][1]>n][0]
-            if start==266 and n-start>13460: #frameshift of ORF1b
-                start-=1
-            posCodonInProt=int((n-start)/3)+1
-            posCodonInNuc=n-(n-start)%3
-            posInCodon=(n-start)%3
-            refcodon=refseq[posCodonInNuc-1:posCodonInNuc+2]
-            newcodon = refcodon[:posInCodon] + alt + refcodon[posInCodon + 1:]
-            for n2 in range(n-posInCodon,n-posInCodon+3):
-                if n2!=n and n2 in [i[0] for i in pp]:
-                    alt2=[i[1] for i in pp if i[0]==n2][0]
-                    posInCodon2=posInCodon+n2-n
-                    newcodon = newcodon[:posInCodon2] + alt2 + newcodon[posInCodon2 + 1:]
-            AAinit=translate(refcodon)
-            AAnew=translate(newcodon)
-            if AAinit!=AAnew:
-                if posCodonInProt==1:
-                    AAnew="?"
-                finallist+=[(str(n),AAinit+str(posCodonInProt)+AAnew)]
-    return(finallist)
-            
+        if alt!="-":
+            for start in [i for i in genes if i<=n and genes[i][1]>=n]:
+                posCodonInProt=int((n-start)/3)+1
+                posCodonInNuc=n-(n-start)%3
+                posInCodon=(n-start)%3
+                refcodon=refseq[posCodonInNuc-1:posCodonInNuc+2]
+                newcodon = refcodon[:posInCodon] + alt + refcodon[posInCodon + 1:]
+                for n2 in range(n-posInCodon,n-posInCodon+3):
+                    if n2!=n and n2 in [i[0] for i in pp]:
+                        alt2=[i[1] for i in pp if i[0]==n2][0]
+                        posInCodon2=posInCodon+n2-n
+                        newcodon = newcodon[:posInCodon2] + alt2 + newcodon[posInCodon2 + 1:]
+                AAinit=translate(refcodon)
+                AAnew=translate(newcodon)
+                if AAinit!=AAnew:
+                    if posCodonInProt==1 and AAnew!=AAinit:
+                        AAnew="?"
+                    finallist+=[(str(n),genes[start][0]+":"+AAinit+str(posCodonInProt)+AAnew)]
+    returnlist=[]
+    for p in set([i[0] for i in finallist]):
+        tag="\n".join([i[1] for i in finallist if i[0]==p])
+        returnlist+=[(p,tag)]
+    return(returnlist)
+
        
             
 #Create a list of panda table containing all the numbers for each of the 29903 positions
@@ -238,7 +266,8 @@ def bighist(tablelist,poslist,y_names,mytitle="",suptables=[],PDFname=""):
         axx.margins(0, 0)  
         nb_sample=sum(t.iloc[0][list(set(t.columns)-set(['POS', 'REF']))])
         if nb_sample<10000:str_nb_sample="\nn="+str(nb_sample)+""
-        else: str_nb_sample="\nn="+str(int(nb_sample/1000))+"K"
+        elif nb_sample<5000000 : str_nb_sample="\nn="+str(int(nb_sample/1000))+"K"
+        else: str_nb_sample="\nn="+str(int(nb_sample/1000000))+"M"
         axx.set_ylabel(y_names[i]+str_nb_sample, fontsize=15)
         
         all_pos_toplot=t.loc[t["POS"].isin(poslist)]
