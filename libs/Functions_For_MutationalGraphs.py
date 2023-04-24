@@ -56,14 +56,9 @@ def get_col(ref,alt):
         return label_color[ref+">"+alt]
 
 
-genes={}
-genes[266]=('ORF1a',13460)
-genes[13459]=('ORF1b',21555)
-genes[21563]=('Spike',25384)
-genes[25393]=('ORF3a',26220)
 def getSubstitutions(t):
     # Scan the table and get all mutations>50%
-    pp=getPositionAndState(t,50,100,False)
+    pp=getPositionAndState(t,min_val_AAlabel,100,False)
     #build a list of annotation for each position
     finallist=[]
     for n,alt in pp:
@@ -91,6 +86,12 @@ def getSubstitutions(t):
         returnlist+=[(p,tag)]
     return(returnlist)
 
+
+genes={}
+genes[266]=('ORF1a',13460)
+genes[13468]=('ORF1b',21555)
+genes[21563]=('Spike',25384)
+genes[25393]=('ORF3a',26220)
 genes[25457]=('ORF3c',25582)
 genes[26245]=('E',26472)
 genes[26523]=('M',27191)
@@ -100,7 +101,7 @@ genes[27756]=('ORF7b',27887)
 genes[27894]=('ORF8',28259)
 genes[28274]=('N',29533)
 #genes[29558]=('ORF10',29674)
-genes[28284]=('ORF9B',28577)
+genes[28284]=('ORF9c',28577)
 
 translationtable = {
     'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
@@ -190,7 +191,9 @@ def getPositionAndState(t,percentmin,percentmax,addmissing):
     #absolute minimum number of sample
     columns=list(set(t.columns)-set(['POS', 'REF']))
     n_min=sumperline(t)/100*percentmin
+    n_min[n_min<1]=1
     n_max=sumperline(t)/100*percentmax
+    n_max[n_max<1]=sumperline(t)
     # for each possible reference allele :
     totalposlist=[]
     for s in statelist:
@@ -268,7 +271,7 @@ def bighist(tablelist,poslist,y_names,mytitle="",suptables=[],PDFname=""):
         if nb_sample<10000:str_nb_sample="\nn="+str(nb_sample)+""
         elif nb_sample<5000000 : str_nb_sample="\nn="+str(int(nb_sample/1000))+"K"
         else: str_nb_sample="\nn="+str(int(nb_sample/1000000))+"M"
-        axx.set_ylabel(y_names[i]+str_nb_sample, fontsize=15)
+        axx.set_ylabel(y_names[i]+str_nb_sample, fontsize=12)
         
         all_pos_toplot=t.loc[t["POS"].isin(poslist)]
         all_bottoms=all_pos_toplot['A']-all_pos_toplot['A']
